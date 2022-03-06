@@ -333,17 +333,29 @@ void BTreeIndex::startScan(const void* lowValParm,
 
 	scanExecuting = true;
 
-	// Set up initial scan parameters (from root)
+	// Check if the root is a leaf
+	currentPageNum = headerPageNum;
+	bufMgr->readPage(file, currentPageNum, currentPageData);
+	IndexMetaInfo* metaInfo = reinterpret_cast<IndexMetaInfo*>(currentPageData);
+	bool isRootLeaf = metaInfo->height == 1;
+	bufMgr->unPinPage(file, currentPageNum, false);
+
+	// Set up initial scan parameters
 	currentPageNum = rootPageNum;
 	bufMgr->readPage(file, currentPageNum, currentPageData);
-	NonLeafNodeInt* currNonLeafNode = 
-		reinterpret_cast<NonLeafNodeInt*>(currentPageData);
 	LeafNodeInt* leaf = NULL;
+	NonLeafNodeInt* currNonLeafNode = NULL;
+	if (isRootLeaf) {
+		leaf = reinterpret_cast<LeafNodeInt*>(currentPageData);
+	}
+	else {
+		currNonLeafNode = reinterpret_cast<NonLeafNodeInt*>(currentPageData);
+	}
 
 	// Loop until a leaf node is found or throw exception if no such key
 	while (!leaf) {
-		for (int entryId = 0; entryId < INTARRAYNONLEAFSIZE; entryId++) {
-			bool isLastEntry = entryId == (INTARRAYNONLEAFSIZE - 1);
+		for (int entryId = 0; entryId < nodeOccupancy; entryId++) {
+			bool isLastEntry = entryId == (nodeOccupancy - 1);
 			int currKey = currNonLeafNode->keyArray[entryId];
 			// Found a possible entry or the last entry of the node
 			if (currKey >= lowValInt || isLastEntry) {
@@ -389,7 +401,7 @@ void BTreeIndex::startScan(const void* lowValParm,
 	// Set a default (but impossible) nextEntry value
 	this->nextEntry = -1;
 	// Check if the wanted entry exists in the current leaf
-	for (int entryId = 0; entryId < INTARRAYLEAFSIZE; entryId++) {
+	for (int entryId = 0; entryId < leafOccupancy; entryId++) {
 		int currKey = leaf->keyArray[entryId];
 		PageId currPageNo = leaf->ridArray[entryId].page_number;
 
