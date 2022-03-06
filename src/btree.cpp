@@ -42,6 +42,9 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 	this->leafOccupancy = INTARRAYLEAFSIZE-1;
 	this->nodeOccupancy = INTARRAYNONLEAFSIZE-1;
 
+	// init some scan parameters
+	this->scanExecuting = false;
+
 	// construct the indexName string (name of the index file)
 	std::ostringstream idxStr;
 	idxStr << relationName << '.' << attrByteOffset;
@@ -430,7 +433,7 @@ void BTreeIndex::startScan(const void* lowValParm,
 	// Set up the sibling page parameters and set the next entry to be the
 	// first entry of the sibling page/node, i.e., 0
 	bufMgr->unPinPage(file, currentPageNum, false);
-	currentPageNum = leaf->rightSibPageNo;
+	this->currentPageNum = leaf->rightSibPageNo;
 	bufMgr->readPage(file, currentPageNum, currentPageData);
 	this->nextEntry = 0;
 }
@@ -456,29 +459,29 @@ void BTreeIndex::scanNext(RecordId& outRid)
 	if (leaf->ridArray[nextEntry + 1].page_number == Page::INVALID_NUMBER) {
 		// Failed to find a sibling node, indicating scan completion
 		if (leaf->rightSibPageNo == Page::INVALID_NUMBER) {
-			nextEntry = -1;
+			this->nextEntry = -1;
 		}
 
 		// Found a sibling node
 		// Set up the sibling page parameters
 		bufMgr->unPinPage(file, currentPageNum, false);
-		currentPageNum = leaf->rightSibPageNo;
+		this->currentPageNum = leaf->rightSibPageNo;
 		bufMgr->readPage(file, currentPageNum, currentPageData);
 		leaf = reinterpret_cast<LeafNodeInt*>(currentPageData);
 		int nextKey = leaf->keyArray[0];
 			
 		// Next key still within the boundary
 		if (nextKey < highValInt || (nextKey == highValInt && highOp == LTE)) {
-			nextEntry = 0;
+			this->nextEntry = 0;
 			return;
 		}
 
 		// Next key not within the boundary, indicating scan completion
-		nextEntry = -1;
+		this->nextEntry = -1;
 	}
 
 	// The next leaf is a valid entry for the current leaf.
-	nextEntry++;
+	this->nextEntry++;
 }
 
 // -----------------------------------------------------------------------------
@@ -491,7 +494,7 @@ void BTreeIndex::endScan()
 		throw ScanNotInitializedException();
 	}
 
-	scanExecuting = false;
+	this->scanExecuting = false;
 	bufMgr->unPinPage(file, currentPageNum, false);
 }
 
