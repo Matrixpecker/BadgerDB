@@ -277,15 +277,15 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
 	Page* rootPage;
 	bufMgr->readPage(file, rootPageNum, rootPage);
 
-	RIDKeyPair<int> insertEntry, newChild;
+	RIDKeyPair<int> insertEntry;
 	insertEntry.set(rid, *((int*)key));
+	PageKeyPair<int> newChild;
 
 	insertUnderNode(&insertEntry, rootPage, isLeaf, &newChild);
 	if (newChild.pageNo == Page::INVALID_NUMBER) {
 		bufMgr->unPinPage(file, headerPageNum, false);
 		// Ponder: should always mark root page dirty?
 		bufMgr->unPinPage(file, rootPageNum, true);
-		bufMgr->flushFile(file);
 		return;
 	}
 
@@ -304,7 +304,6 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
 	metaInfo->rootPageNo = newRootPageId;
 	bufMgr->unPinPage(file, headerPageNum, true);
 	bufMgr->unPinPage(file, rootPageNum, true);
-	bufMgr->flushFile(file);
 	return;
 }
 
