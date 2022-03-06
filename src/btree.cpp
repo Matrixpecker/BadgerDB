@@ -313,12 +313,12 @@ void BTreeIndex::startScan(const void* lowValParm,
 		throw BadOpcodesException();
 	}
 	
-	this->lowOp = lowOpParm;
-	this->highOp = highOpParm;
-	this->lowValInt = *((int*)lowValParm);
-	this->highValInt = *((int*)highValInt);
+	lowOp = lowOpParm;
+	highOp = highOpParm;
+	lowValInt = *((int*)lowValParm);
+	highValInt = *((int*)highValParm);
 
-	if (this->lowValInt > this->highValInt) {
+	if (lowValInt > highValInt) {
 		throw BadScanrangeException();
 	}
 
@@ -326,6 +326,8 @@ void BTreeIndex::startScan(const void* lowValParm,
 	if (scanExecuting) {
 		endScan();
 	}
+
+	scanExecuting = true;
 
 	// Set up initial scan parameters (from root)
 	currentPageNum = rootPageNum;
@@ -385,8 +387,7 @@ void BTreeIndex::startScan(const void* lowValParm,
 			break;
 		}
 
-		if (currKey > lowValInt || 
-			(currKey == lowValInt && lowOp == GTE)) {
+		if (currKey > lowValInt || (currKey == lowValInt && lowOp == GTE)) {
 			nextEntry = entryId;
 			break;
 		}
@@ -420,9 +421,6 @@ void BTreeIndex::scanNext(RecordId& outRid)
 	if (!scanExecuting) {
 		throw ScanNotInitializedException();
 	}
-	if (nextEntry == -1) {
-		throw IndexScanCompletedException();
-	}
 
 	LeafNodeInt* leaf = reinterpret_cast<LeafNodeInt*>(currentPageData);
 	outRid = leaf->ridArray[nextEntry];
@@ -432,8 +430,7 @@ void BTreeIndex::scanNext(RecordId& outRid)
 	if (leaf->ridArray[nextEntry + 1].page_number == Page::INVALID_NUMBER) {
 		// Failed to find a sibling node, indicating scan completion
 		if (leaf->rightSibPageNo == Page::INVALID_NUMBER) {
-			nextEntry = -1;
-			return;
+			throw IndexScanCompletedException();
 		}
 
 		// Found a sibling node
@@ -450,8 +447,8 @@ void BTreeIndex::scanNext(RecordId& outRid)
 			return;
 		}
 
-		// Next key not within the boundary
-		nextEntry = -1;
+		// Next key not within the boundary, indicating scan completion
+		throw IndexScanCompletedException();
 	}
 
 	// The next leaf is a valid entry for the current leaf.
