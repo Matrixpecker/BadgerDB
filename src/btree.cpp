@@ -421,6 +421,9 @@ void BTreeIndex::scanNext(RecordId& outRid)
 	if (!scanExecuting) {
 		throw ScanNotInitializedException();
 	}
+	if (nextEntry == -1) {
+		throw IndexScanCompletedException();
+	}
 
 	LeafNodeInt* leaf = reinterpret_cast<LeafNodeInt*>(currentPageData);
 	outRid = leaf->ridArray[nextEntry];
@@ -430,7 +433,7 @@ void BTreeIndex::scanNext(RecordId& outRid)
 	if (leaf->ridArray[nextEntry + 1].page_number == Page::INVALID_NUMBER) {
 		// Failed to find a sibling node, indicating scan completion
 		if (leaf->rightSibPageNo == Page::INVALID_NUMBER) {
-			throw IndexScanCompletedException();
+			nextEntry = -1;
 		}
 
 		// Found a sibling node
@@ -448,7 +451,7 @@ void BTreeIndex::scanNext(RecordId& outRid)
 		}
 
 		// Next key not within the boundary, indicating scan completion
-		throw IndexScanCompletedException();
+		nextEntry = -1;
 	}
 
 	// The next leaf is a valid entry for the current leaf.
