@@ -68,7 +68,7 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 		// create MetaPage @388
 		Page *metaPage;
 		PageId metaPageId;
-		this->bufMgr->allocPage(this->file, metaPageId, metaPage);
+		bufMgr->allocPage(file, metaPageId, metaPage);
 		this->headerPageNum = metaPageId;
 		
 		IndexMetaInfo *metaInfo = reinterpret_cast<IndexMetaInfo *>(metaPage);
@@ -79,17 +79,17 @@ BTreeIndex::BTreeIndex(const std::string & relationName,
 		// create RootPage @393
 		Page *rootPage;
 		PageId rootPageId;
-		this->bufMgr->allocPage(this->file, rootPageId, rootPage);
+		bufMgr->allocPage(file, rootPageId, rootPage);
 		metaInfo->rootPageNo = rootPageId;
-
+		this->rootPageNum = rootPageId;
 
 		// key1 <= entry < key2.
 		metaInfo->height = 1;
 		// Initialization of rootnode
-		LeafNodeInt* root_node = reinterpret_cast<LeafNodeInt*>(rootPage);
-		root_node->rightSibPageNo = Page::INVALID_NUMBER;
-		root_node->keyArray[0] = INT_MAX;
-		root_node->ridArray[0].page_number = Page::INVALID_NUMBER;
+		LeafNodeInt* rootNode = reinterpret_cast<LeafNodeInt*>(rootPage);
+		rootNode->rightSibPageNo = Page::INVALID_NUMBER;
+		rootNode->keyArray[0] = INT_MAX;
+		rootNode->ridArray[0].page_number = Page::INVALID_NUMBER;
 		
 		// insert entries
 		FileScan fscan(relationName, this->bufMgr);
@@ -264,34 +264,32 @@ void BTreeIndex::insertUnderNode(RIDKeyPair<int>* entry, Page* cur_page, bool is
 	}
 }
 
-
 void BTreeIndex::insertEntry(const void *key, const RecordId rid) 
 {
-	RIDKeyPair<int>* insert_entry;
-	insert_entry->set(rid, *((int*)key));
-	Page* root_page;
-	bufMgr->readPage(this->file, this->rootPageNum, root_page);
-	PageKeyPair<int>* new_child;
+	Page* metaPage;
+	bufMgr->readPage(file, headerPageNum, metaPage);
+	IndexMetaInfo* metaInfo = reinterpret_cast<IndexMetaInfo*>(metaPage);
+	bool isLeaf = (metaInfo->height == 1);
 
-	Page* meta_page;
-	bufMgr->readPage(this->file, this->headerPageNum, meta_page);
-	IndexMetaInfo* meta_info = reinterpret_cast<IndexMetaInfo*>(meta_page);
-	bool is_leaf = (meta_info->height == 1);
+	Page* rootPage;
+	bufMgr->readPage(file, rootPageNum, rootPage);
 
-	this->insertUnderNode(insert_entry, root_page, is_leaf, new_child);
+	RIDKeyPair<int> insertEntry, newChild;
+	insertEntry.set(rid, *((int*)key));
 
-	if (new_child->pageNo == Page::INVALID_NUMBER) {
+	insertUnderNode(&insertEntry, rootPage, isLeaf, &newChild);
+	if (newChild.pageNo == Page::INVALID_NUMBER) {
 		return;
 	}
 
-	Page* new_root_page = new Page;
-	PageId new_root_page_id;
-	this->bufMgr->allocPage(this->file, new_root_page_id, new_root_page);
-	NonLeafNodeInt* new_root_node = reinterpret_cast<NonLeafNodeInt*>(new_root_page);
-	new_root_node->pageNoArray[0] = this->rootPageNum;
-	new_root_node->keyArray[0] = new_child->key;
-	new_root_node->pageNoArray[1] = new_child->pageNo;
-	this->rootPageNum = new_root_page_id;
+	Page* newRootPage;
+	PageId newRootPageId;
+	bufMgr->allocPage(file, newRootPageId, newRootPage);
+	NonLeafNodeInt* newRootNode = reinterpret_cast<NonLeafNodeInt*>(newRootPage);
+	newRootNode->pageNoArray[0] = rootPageNum;
+	newRootNode->keyArray[0] = newChild.key;
+	newRootNode->pageNoArray[1] = newChild.pageNo;
+	this->rootPageNum = newRootPageId;
 	return;
 }
 
