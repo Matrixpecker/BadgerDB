@@ -219,6 +219,7 @@ void BTreeIndex::insertUnderNode(RIDKeyPair<int>* entry, PageId cur_page_id, boo
 		
 
 		if (new_child->pageNo == Page::INVALID_NUMBER) {
+			bufMgr->unPinPage(this->file, cur_page_id, true);
 			return;
 		}
 
@@ -409,7 +410,8 @@ void BTreeIndex::startScan(const void* lowValParm,
 			break;
 		}
 
-		if (currKey > lowValInt || (currKey == lowValInt && lowOp == GTE)) {
+		if ((currKey > lowValInt && currKey < highValInt) || 
+			(currKey == lowValInt && lowOp == GTE)) {
 			this->nextEntry = entryId;
 			break;
 		}
@@ -456,6 +458,7 @@ void BTreeIndex::scanNext(RecordId& outRid)
 		// Failed to find a sibling node, indicating scan completion
 		if (leaf->rightSibPageNo == Page::INVALID_NUMBER) {
 			this->nextEntry = -1;
+			return;
 		}
 
 		// Found a sibling node
@@ -474,10 +477,17 @@ void BTreeIndex::scanNext(RecordId& outRid)
 
 		// Next key not within the boundary, indicating scan completion
 		this->nextEntry = -1;
+		return;
 	}
 
 	// The next leaf is a valid entry for the current leaf.
-	this->nextEntry++;
+	int nextKey = leaf->keyArray[nextEntry + 1];
+	if (nextKey < highValInt || (nextKey == highValInt && highOp == LTE)) {
+		this->nextEntry++;
+	}
+	else {
+		this->nextEntry = -1;
+	}
 }
 
 // -----------------------------------------------------------------------------
