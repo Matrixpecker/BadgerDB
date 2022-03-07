@@ -406,6 +406,11 @@ void BTreeIndex::startScan(const void* lowValParm,
 		int currKey = leaf->keyArray[entryId];
 		PageId currPageNo = leaf->ridArray[entryId].page_number;
 
+		// Throw exception if currKey is already greater than the higher bound
+		if (currKey > highValInt) {
+			throw NoSuchKeyFoundException();
+		}
+
 		// Have traversed to the last valid entry of the leaf
 		if (currPageNo == Page::INVALID_NUMBER) {
 			break;
