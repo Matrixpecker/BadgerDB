@@ -142,7 +142,7 @@ void BTreeIndex::insertUnderNode(RIDKeyPair<int>* entry, PageId cur_page_id, boo
 	if (is_leaf)
 	{
 		LeafNodeInt* cur_node = reinterpret_cast<LeafNodeInt*>(cur_page);
-		/// find the last record's position
+		/// find the number of slots in this node
 		int entry_num = 0;
 		for (; entry_num <= this->leafOccupancy; entry_num++) {
 			if (cur_node->ridArray[entry_num].page_number == 0) {
@@ -219,7 +219,8 @@ void BTreeIndex::insertUnderNode(RIDKeyPair<int>* entry, PageId cur_page_id, boo
 		
 
 		if (new_child->pageNo == Page::INVALID_NUMBER) {
-			return;
+		  bufMgr->unPinPage(this->file, cur_page_id, false);
+		  return;
 		}
 
 		/// find how many children do the node have ( the number of entries)
@@ -262,8 +263,8 @@ void BTreeIndex::insertUnderNode(RIDKeyPair<int>* entry, PageId cur_page_id, boo
 		}
 		else {
 			/// set the next entry as [Page::INVALID_NUMBER, INT_MAX] to be identify as bound
-			cur_node->pageNoArray[entry_num] = Page::INVALID_NUMBER;
-			cur_node->keyArray[entry_num + 1] = INT_MAX;
+			cur_node->pageNoArray[entry_num + 1] = Page::INVALID_NUMBER;
+			cur_node->keyArray[entry_num] = INT_MAX;
 			new_child->set(Page::INVALID_NUMBER, entry->key);
 		}
 	}
@@ -296,6 +297,7 @@ void BTreeIndex::insertEntry(const void *key, const RecordId rid)
 	newRootNode->pageNoArray[0] = rootPageNum;
 	newRootNode->keyArray[0] = newChild.key;
 	newRootNode->pageNoArray[1] = newChild.pageNo;
+	newRootNode->level = isLeaf;
 	this->rootPageNum = newRootPageId;
 	metaInfo->height++;
 	metaInfo->rootPageNo = newRootPageId;
